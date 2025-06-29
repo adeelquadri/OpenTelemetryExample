@@ -2,6 +2,9 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+//using OpenTelemetryExample.API.Configs;
+using OpenTelemetryExample.API.Services;
+using OpenTelemetryExample.API.Services.Classes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,39 +15,69 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddSingleton<IMetricsService, MetricsService>();
 
-string? tracingOtlpEndpoint = builder.Configuration["OTLP_ENDPOINT_URL"];
+//string? tracingOtlpEndpoint = builder.Configuration["OTLP_ENDPOINT_URL"];
+//builder.Services.AddOpenTelemetry()
+//    .ConfigureResource(resource => resource.AddService("OpenTelemetryExample.API"))
+//    .WithMetrics(metrics =>
+//    {
+//        metrics
+//            .AddAspNetCoreInstrumentation()
+//            .AddHttpClientInstrumentation()
+//            .AddConsoleExporter();
+
+//        metrics.AddOtlpExporter();
+//    })
+//    .WithTracing(tracing =>
+//    {
+//        tracing
+//            .AddAspNetCoreInstrumentation()
+//            .AddHttpClientInstrumentation();
+
+//        if (!string.IsNullOrWhiteSpace(tracingOtlpEndpoint))
+//        {
+//            tracing.AddOtlpExporter(otlpOptions =>
+//            {
+//                otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
+//            });
+//        }
+//        else
+//        {
+//            tracing.AddConsoleExporter();
+//        }
+//    });
+
+//builder.Logging.AddOpenTelemetry(logging => logging.AddOtlpExporter());
+
+//string? tracingOtlpEndpoint = builder.Configuration["OTLP_ENDPOINT_URL"];
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeFormattedMessage = true;
+    logging.IncludeScopes = true;
+    logging.AddOtlpExporter();
+});
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("OpenTelemetryExample.API"))
+    .ConfigureResource(resource => resource.AddService(builder.Environment.ApplicationName))
     .WithMetrics(metrics =>
     {
-        metrics
-            .AddAspNetCoreInstrumentation()
+        metrics.AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddConsoleExporter();
+            .AddRuntimeInstrumentation()
+            .AddMeter(AppDomain.CurrentDomain.FriendlyName);
 
         metrics.AddOtlpExporter();
     })
     .WithTracing(tracing =>
     {
-        tracing
+        tracing.AddSource(builder.Environment.ApplicationName)
             .AddAspNetCoreInstrumentation()
+            // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+            //.AddGrpcClientInstrumentation()
             .AddHttpClientInstrumentation();
 
-        if (!string.IsNullOrWhiteSpace(tracingOtlpEndpoint))
-        {
-            tracing.AddOtlpExporter(otlpOptions =>
-            {
-                otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
-            });
-        }
-        else
-        {
-            tracing.AddConsoleExporter();
-        }
+        tracing.AddOtlpExporter();
     });
-
-builder.Logging.AddOpenTelemetry(logging => logging.AddOtlpExporter());
 
 var app = builder.Build();
 
